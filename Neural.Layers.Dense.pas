@@ -17,11 +17,10 @@ type
     function RunNode(const AInputs, AWeights: TArray<Single>; ABias: Single): Single;
     procedure RunNodeBackwards(const AResult, Gradient, ALearnRate: Single; var AWeights: TArray<Single>; var ABias: Single; var TargetGradients: TArray<Single>);
   public
-    constructor Create(ACount: Integer; const AActivation: TActivation); reintroduce;
+    constructor Create(ACount: Integer; const AActivation: TActivation; const AWeightInitializer: TInitializerFunc = nil); reintroduce;
     procedure Build; override;
     function FeedForward(const Input: TArray<Single>): TArray<Single>; override;
     function Backpropagade(const AGradients: TArray<Single>; const ALearningRate: Single): TArray<Single>; override;
-
   end;
 
 implementation
@@ -56,14 +55,14 @@ begin
   LInputs := FInputShape.Size;
   for i := Low(FWeights) to High(FWeights) do
   begin
-    FWeights[i] := BuildWeights(LInputs);
+    FWeights[i] := FWeightInitializer([LInputs]).Flat;
     FBiases[i] := 0;
   end;
 end;
 
-constructor TDenseLayer.Create(ACount: Integer; const AActivation: TActivation);
+constructor TDenseLayer.Create(ACount: Integer; const AActivation: TActivation; const AWeightInitializer: TInitializerFunc = nil);
 begin
-  inherited Create(AActivation);
+  inherited Create(AActivation, AWeightInitializer);
   FNeuronCount := ACount;
 end;
 

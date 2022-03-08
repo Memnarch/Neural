@@ -17,11 +17,12 @@ type
     FLayers: TArray<TNeuralLayer>;
     FLongestLayer: Integer;
     FInputCount: Integer;
+    FLoss: TLoss;
     procedure CopyValues(var ATarget: TArray<Single>; const ASource: TArray<Single>);
     procedure Backpropagade(const ALearningRate, APartialDerived: Single);
   public
     destructor Destroy; override;
-    procedure Build(const AInput: TShape; const ALayers: TArray<TNeuralLayer>);
+    procedure Build(const AInput: TShape; const ALayers: TArray<TNeuralLayer>; const ALoss: TLoss);
     function FeedForward(const AValues: TArray<Single>): TArray<Single>;
     procedure Train(const AData: TArray<TArray<Single>>; const AExpected: TArray<Single>; AEpochs: Integer = 1000; ALearningRate: Single = 0.01);
     property OnEpochProgression: TEpochProgression read FOnEpochProgression write FOnEpochProgression;
@@ -36,7 +37,7 @@ uses
 
 procedure TNeuralNetwork.Backpropagade(const ALearningRate, APartialDerived: Single);
 var
-  i, k: Integer;
+  i: Integer;
   LGradient: TArray<Single>;
 begin
   LGradient := [APartialDerived];
@@ -44,12 +45,12 @@ begin
     LGradient := FLayers[i].Backpropagade(LGradient, ALearningRate);
 end;
 
-procedure TNeuralNetwork.Build(const AInput: TShape; const ALayers: TArray<TNeuralLayer>);
+procedure TNeuralNetwork.Build(const AInput: TShape; const ALayers: TArray<TNeuralLayer>; const ALoss: TLoss);
 var
-  i: Integer;
-  LPrevInput, LPrevOutput: TShape;
+  LPrevOutput: TShape;
   LLayer: TNeuralLayer;
 begin
+  FLoss := ALoss;
   FInputCount := AInput.Size;
   FLongestLayer := FInputCount;
   FLayers := ALayers;
@@ -96,7 +97,6 @@ var
   LResults: TArray<Single>;
   LPartialDerived: Single;
   LUpdateSteps: Integer;
-  LGradient: TArray<Single>;
 begin
   LUpdateSteps := Max(1, AEpochs div 100);
   for i := 1 to AEpochs do
@@ -105,7 +105,7 @@ begin
     begin
       LResults := FeedForward(AData[k]);
 
-      LPartialDerived := -2 * (AExpected[k] - LResults[0]);
+      LPartialDerived := FLoss.Derive([AExpected[k]], [LResults[0]]);
       Backpropagade(ALearningRate, LPartialDerived);
     end;
     if ((i mod LUpdateSteps) = 0) and Assigned(FOnEpochProgression) then
