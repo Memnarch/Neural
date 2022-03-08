@@ -12,6 +12,8 @@ procedure SoftMax(const Inputs, Outputs: TArray<Single>);
 
 implementation
 
+{$ExcessPrecision OFF}
+
 uses
   System.Math;
 

@@ -4,7 +4,8 @@ interface
 
 uses
   Neural,
-  Neural.Layers;
+  Neural.Layers,
+  Neural.Scheduler;
 
 type
   TEpochProgression = reference to procedure(ACurrentEpoche: Integer);
@@ -13,6 +14,7 @@ type
   TNeuralNetwork = class
   private
     FOnEpochProgression: TEpochProgression;
+    FScheduler: IScheduler;
   protected
     FLayers: TArray<TNeuralLayer>;
     FLongestLayer: Integer;
@@ -26,9 +28,12 @@ type
     function FeedForward(const AValues: TArray<Single>): TArray<Single>;
     procedure Train(const AData: TArray<TArray<Single>>; const AExpected: TArray<Single>; AEpochs: Integer = 1000; ALearningRate: Single = 0.01);
     property OnEpochProgression: TEpochProgression read FOnEpochProgression write FOnEpochProgression;
+    property Scheduler: IScheduler read FScheduler write FScheduler;
   end;
 
 implementation
+
+{$ExcessPrecision OFF}
 
 uses
   System.Math;
@@ -57,6 +62,7 @@ begin
   LPrevOutput := AInput;
   for LLayer in FLayers do
   begin
+    LLayer.Scheduler := FScheduler;
     LLayer.InputShape := LPrevOutput;
     LLayer.Build;
     LPrevOutput := LLayer.OutputShape;

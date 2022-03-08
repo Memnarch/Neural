@@ -14,6 +14,7 @@ type
     FBiases: TArray<Single>;
     FLastOutput: TArray<Single>;
     FLastInput: TArray<Single>;
+    FBackPropagationBuffer: TArray<TArray<Single>>;
     function RunNode(const AInputs, AWeights: TArray<Single>; ABias: Single): Single;
     procedure RunNodeBackwards(const AResult, Gradient, ALearnRate: Single; var AWeights: TArray<Single>; var ABias: Single; var TargetGradients: TArray<Single>);
   public
@@ -28,18 +29,29 @@ implementation
 uses
   Windows;
 
+{$EXCESSPRECISION OFF}
+
 { TDenseLayer }
 
 function TDenseLayer.Backpropagade(const AGradients: TArray<Single>;
   const ALearningRate: Single): TArray<Single>;
 var
+  LResult: TArray<Single>;
   i: Integer;
 begin
   SetLength(Result, Length(FLastInput));
   ZeroMemory(@Result[0], Length(Result) * SizeOf(Result[0]));
-  for i := Low(FWeights) to High(FWeights) do
+  RunScheduled(Length(FWeights),
+    procedure(Index: Integer)
+    begin
+      ZeroMemory(@FBackPropagationBuffer[Index, 0], Length(FBackPropagationBuffer[Index]) * SizeOf(Single));
+      RunNodeBackwards(FLastOutput[Index], AGradients[Index], ALearningRate, FWeights[Index], FBiases[Index], FBackPropagationBuffer[Index]);
+    end
+  );
+  for LResult in FBackPropagationBuffer do
   begin
-    RunNodeBackwards(FLastOutput[i], AGradients[i], ALearningRate, FWeights[i], FBiases[i], Result);
+    for i := Low(LResult) to High(LResult) do
+      Result[i] := Result[i] + LResult[i];
   end;
 end;
 
@@ -49,6 +61,7 @@ var
   LInputs: Integer;
 begin
   inherited;
+  SetLength(FBackPropagationBuffer, FNeuronCount);
   SetLength(FWeights, FNeuronCount);
   SetLength(FBiases, FNeuronCount);
   FOutputShape := TShape.Create(FNeuronCount);
@@ -57,6 +70,7 @@ begin
   begin
     FWeights[i] := FWeightInitializer([LInputs]).Flat;
     FBiases[i] := 0;
+    SetLength(FBackPropagationBuffer[i], LInputs);
   end;
 end;
 
@@ -68,16 +82,19 @@ end;
 
 function TDenseLayer.FeedForward(const Input: TArray<Single>): TArray<Single>;
 var
-  i: Integer;
+  LResult: TArray<Single>;
 begin
   FLastInput := Input;
-  SetLength(Result, FOutputShape.Size);
+  SetLength(LResult, FOutputShape.Size);
   SetLength(FLastOutput, FOutputShape.Size);
-  for i := Low(FWeights) to High(FWeights) do
-  begin
-    FLastOutput[i] := RunNode(Input, FWeights[i], FBiases[i]);
-    Result[i] := FActivation.Run(FLastOutput[i]);
-  end;
+  RunScheduled(Length(FWeights),
+    procedure(Index: Integer)
+    begin
+      FLastOutput[Index] := RunNode(Input, FWeights[Index], FBiases[Index]);
+      LResult[Index] := FActivation.Run(FLastOutput[Index]);
+    end
+  );
+  Result := LResult;
 end;
 
 function TDenseLayer.RunNode(const AInputs, AWeights: TArray<Single>;

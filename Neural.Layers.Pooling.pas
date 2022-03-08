@@ -24,6 +24,8 @@ type
 
 implementation
 
+{$EXCESSPRECISION OFF}
+
 { TMaxPoolingLayer }
 
 function TMaxPoolingLayer.Backpropagade(const AGradients: TArray<Single>;

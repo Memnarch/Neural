@@ -75,6 +75,8 @@ function CheckBounds(const AShape: TShape; X, Y, Z: Integer): Boolean; overload;
 
 implementation
 
+{$ExcessPrecision OFF}
+
 uses
   Neural.Math;
 
