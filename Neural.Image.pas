@@ -3,6 +3,7 @@ unit Neural.Image;
 interface
 
 uses
+  Neural,
   System.Types,
   Graphics;
 
@@ -15,12 +16,25 @@ type
     destructor Destroy; override;
     procedure LoadFromFile(const AFile: string);
     function ToLumenValues: TArray<Single>;
+    procedure FromLumenValues(const ANums: TNums);
+    property Image: TBitmap read FImage;
   end;
 
 implementation
 
 uses
+  System.Math,
   VCL.Imaging.jpeg;
+
+
+type
+  TRGB24 = packed record
+    R, G, B: Byte;
+  end;
+
+  PRGB24 = ^TRGB24;
+
+{$POINTERMATH ON}
 
 { TNeuralImage }
 
@@ -35,6 +49,28 @@ destructor TNeuralImage.Destroy;
 begin
   FImage.Free;
   inherited;
+end;
+
+procedure TNeuralImage.FromLumenValues(const ANums: TNums);
+var
+  LLine: PRGB24;
+  i, k: Integer;
+  LVal: Byte;
+  LNum: Single;
+begin
+  FImage.SetSize(ANums.Shape.Width, ANums.Shape.Height);
+  for i := 0 to Pred(FImage.Height) do
+  begin
+    LLine := FImage.ScanLine[i];
+    for k := 0 to Pred(FImage.Width) do
+    begin
+      LNum := ANums[i, k] * - 255;
+      LVal := Max(0, Min(255, Round(LNum)));
+      LLine[k].R := LVal;
+      LLine[k].G := LVal;
+      LLine[k].B := LVal;
+    end;
+  end;
 end;
 
 procedure TNeuralImage.LoadFromFile(const AFile: string);
@@ -65,15 +101,6 @@ begin
   end;
 end;
 
-type
-  TRGB24 = packed record
-    R, G, B: Byte;
-  end;
-
-  PRGB24 = ^TRGB24;
-
-{$POINTERMATH ON}
-
 function TNeuralImage.ToLumenValues: TArray<Single>;
 var
   LPixels: PRGB24;
@@ -89,7 +116,7 @@ begin
     for k := 0 to Pred(FImage.Width) do
     begin
       LLumen := 0.2126 * LPixels[k].R + 0.7152 * LPixels[k].G + 0.0722 * LPixels[k].B;
-      Result[LCursor] := LLumen / 255;//normalize
+      Result[LCursor] := LLumen / 255 - 0.5;//normalize
       Inc(LCursor);
     end;
   end;
