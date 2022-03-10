@@ -9,12 +9,13 @@ uses
 
 type
   TEpochProgression = reference to procedure(ACurrentEpoche: Integer);
-
+  TOnLayerFinished = reference to procedure(Index: Integer; ALayer: TNeuralLayer; const AOutput: TArray<Single>);
 
   TNeuralNetwork = class
   private
     FOnEpochProgression: TEpochProgression;
     FScheduler: IScheduler;
+    FOnLayerDone: TOnLayerFinished;
   protected
     FLayers: TArray<TNeuralLayer>;
     FLongestLayer: Integer;
@@ -28,6 +29,7 @@ type
     function FeedForward(const AValues: TArray<Single>): TArray<Single>;
     procedure Train(const AData: TArray<TArray<Single>>; const AExpected: TArray<Single>; AEpochs: Integer = 1000; ALearningRate: Single = 0.01);
     property OnEpochProgression: TEpochProgression read FOnEpochProgression write FOnEpochProgression;
+    property OnLayerDone: TOnLayerFinished read FOnLayerDone write FOnLayerDone;
     property Scheduler: IScheduler read FScheduler write FScheduler;
   end;
 
@@ -90,10 +92,19 @@ end;
 function TNeuralNetwork.FeedForward(const AValues: TArray<Single>): TArray<Single>;
 var
   LLayer: TNeuralLayer;
+  i: Integer;
 begin
+  i := 0;
   Result := AValues;
   for LLayer in FLayers do
+  begin
     Result := LLayer.FeedForward(Result);
+    if Assigned(FOnLayerDone) then
+    begin
+      FOnLayerDone(i, LLayer, Result);
+      Inc(i);
+    end;
+  end;
 end;
 
 procedure TNeuralNetwork.Train(const AData: TArray<TArray<Single>>;
