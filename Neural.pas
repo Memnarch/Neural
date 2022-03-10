@@ -58,6 +58,7 @@ type
     Run: TLossFunc;
     Derive: TLossFunc;
     class function MSE: TLoss; static;
+    class function BinaryCrossEntropy: TLoss; static;
   end;
 
   TInitializerFunc = reference to function(const AShape: TShape): TNums;
@@ -78,6 +79,7 @@ implementation
 {$ExcessPrecision OFF}
 
 uses
+  Math,
   Neural.Math;
 
 { TShape }
@@ -130,6 +132,49 @@ begin
 end;
 
 { TLoss }
+
+function BCE(const AExpected, ACalculated: TArray<Single>): Single;
+var
+  i, LLabel: Integer;
+  LCalc: Single;
+begin
+  Result := 0;
+  for i := Low(AExpected) to High(AExpected) do
+  begin
+    LLabel := Round(AExpected[i]);
+    LCalc := ACalculated[i];
+    if LLabel = 0 then
+      Result := Result + Ln(LCalc)
+    else if LCalc <> 1 then
+      Result := Result + Ln(1-LCalc);
+  end;
+  Result := -(Result / Length(AExpected));
+end;
+
+function DerivedBCE(const AExpected, ACalculated: TArray<Single>): Single;
+var
+  i: Integer;
+  LCalc: Single;
+  LLabel: Integer;
+begin
+  Result := 0;
+  for i := Low(AExpected) to High(AExpected) do
+  begin
+    LCalc := ACalculated[i];
+    LLabel := Round(AExpected[i]);
+    if LLabel = 1 then
+      Result := Result + (1 / LCalc)
+    else if LCalc <> 1 then
+      Result := Result + (1 / (1 - LCalc));
+  end;
+  Result := -(Result / Length(AExpected));
+end;
+
+class function TLoss.BinaryCrossEntropy: TLoss;
+begin
+  Result.Run := BCE;
+  Result.Derive := DerivedBCE;
+end;
 
 class function TLoss.MSE: TLoss;
 begin
@@ -262,13 +307,16 @@ class function TInitializers.Random: TInitializerFunc;
 begin
   Result := function(const AShape: TShape): TNums
             var
-              i: Integer;
+              i, LCount: Integer;
+              LBase: Single;
             const
               CMax = 1000;
             begin
               Result := TNums.Create(AShape);
+              LCount := Length(Result.Flat);
+              LBase := 1 / LCount;
               for i := Low(Result.Flat) to High(Result.Flat) do
-                Result.Flat[i] := System.Random(CMax) / CMax;
+                Result.Flat[i] := System.Random(CMax) / CMax * LBase;
             end;
 end;
 
