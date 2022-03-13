@@ -35,14 +35,14 @@ begin
   LRun.Input := TNums.Create([4, 4], [
     1, 2, 3, 4,
     5, 6, 7, 8,
-    9, 10, 11, 12,
-    13, 14, 15, 16
+    9, 10, -11, -12,
+    13, 14, -15, -16
   ]);
   LRun.Output := TNums.Create(
     [2, 2],
     [
       6, 8,
-      14, 16
+      14, -11
     ]
   );
   LRun.InGradients := TNums.Create(
@@ -56,8 +56,8 @@ begin
   LRun.OutGradients := TNums.Create([4, 4], [
     0, 0, 0, 0,
     0, 22, 0, 23,
-    0, 0, 0, 0,
-    0, 24, 0, 25
+    0, 0, 25, 0,
+    0, 24, 0, 0
   ]);
   Result := [LRun];
 end;

@@ -98,7 +98,7 @@ var
   i, k: Integer;
   LVal, LCurrent: Single;
 begin
-  LVal := 0;
+  LVal := AInput[x*FSize.cx, Y*FSize.cy];
   for i := 0 to Pred(FSize.cx) do
   begin
     for k := 0 to Pred(FSize.cy) do
