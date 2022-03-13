@@ -14,7 +14,7 @@ type
     FLastOutput: TArray<Single>;
     procedure ApplyKernel(X, Y: Integer; const Input, Target: TNums);
     procedure ApplySingleKernel(X, Y, Index: Integer; const Input, Target: TNums);
-    procedure DeriveKernel(X, Y: Integer; const AKernel, AGradients, AInput: TNums);
+    procedure DeriveKernel(X, Y: Integer; const AKernel, AGradients, AInput, ATargetGradients: TNums);
   public
     procedure Build; override;
     function FeedForward(const Input: TArray<Single>): TArray<Single>; override;
@@ -58,6 +58,7 @@ begin
   end;
   Target[X, Y] := LVal;
 end;
+
 function TConv2D.Backpropagade(const AGradients: TArray<Single>;
   const ALearningRate: Single): TArray<Single>;
 var
@@ -65,7 +66,9 @@ var
   LInput: TNums;
   LGradients: TNums;
   i, k, f: Integer;
+  LResult: TNums;
 begin
+  LResult := TNums.Create(FInputShape);
   for f := 0 to High(FKernels) do
   begin
     LDKernel := TNums.Create(FKernels[f].Shape);
@@ -73,12 +76,13 @@ begin
     LGradients := TNums.Create(FOutputShape, AGradients);
     for i := 0 to Pred(LGradients.Shape.Width) do
       for k := 0 to Pred(LGradients.Shape.Height) do
-        DeriveKernel(i, k, LDKernel, LGradients, LInput);
+        DeriveKernel(i, k, LDKernel, LGradients, LInput, LResult);
 
     for i := 0 to Pred(LDKernel.Shape.Width) do
       for k := 0 to Pred(LDKernel.Shape.Height) do
         FKernels[f][i, k] := FKernels[f][i, k] - ALearningRate * LDKernel[i, k];
   end;
+  Result := LResult.Flat;
 end;
 
 procedure TConv2D.Build;
@@ -92,13 +96,16 @@ begin
   FOutputShape := [FInputShape.Width - 2, FInputShape.Height - 2];
 end;
 
-procedure TConv2D.DeriveKernel(X, Y: Integer; const AKernel, AGradients, AInput: TNums);
+procedure TConv2D.DeriveKernel(X, Y: Integer; const AKernel, AGradients, AInput, ATargetGradients: TNums);
 var
   i, k: Integer;
 begin
   for i := 0 to Pred(AKernel.Shape.Width) do
     for k := 0 to Pred(AKernel.Shape.Height) do
+    begin
+      ATargetGradients[x+i, y+k] := ATargetGradients[x+i, y+k] + AKernel[i, k] * AInput[i+x, k+y] * AGradients[X, Y];
       AKernel[i, k] := AKernel[i, k] + (AGradients[X, Y] * AInput[i+X, k+Y]);
+    end;
 end;
 
 procedure TConv2D.DrawFeatureMap(AIndex: Integer; const AInput, ATarget: TNums);
