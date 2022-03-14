@@ -13,8 +13,8 @@ type
     FSize: TSize;
     FLastInput: TArray<Single>;
     FLastOutput: TArray<Single>;
-    procedure Sample(X, Y: Integer; const AInput, AOutput: TNums);
-    procedure PutBacki(X, Y: Integer; const AInputs, AOutput: TNums; const AHighValue, AGradient: Single);
+    procedure Sample(X, Y, Z: Integer; const AInput, AOutput: TNums);
+    procedure PutBacki(X, Y, Z: Integer; const AInputs, AOutput: TNums; const AHighValue, AGradient: Single);
   public
     constructor Create(const ASize: TSize); reintroduce;
     procedure Build; override;
@@ -31,7 +31,7 @@ implementation
 function TMaxPoolingLayer.Backpropagade(const AGradients: TArray<Single>;
   const ALearningRate: Single): TArray<System.Single>;
 var
-  i, k: Integer;
+  i, k, m: Integer;
   LInput, LOutput, LLastOutput, LGradients: TNums;
 begin
   LInput := TNums.Create(FInputShape, FLastInput);
@@ -42,7 +42,8 @@ begin
   for i := 0 to Pred(FOutputShape.Width) do
   begin
     for k := 0 to Pred(FOutputShape.Height) do
-      PutBacki(i * FSize.cx, k * FSize.cy, LInput, LOutput, LLastOutput[i, k], LGradients[i, k]);
+      for m := 0 to Pred(FOutputShape.Depth) do
+        PutBacki(i * FSize.cx, k * FSize.cy, m, LInput, LOutput, LLastOutput[i, k, m], LGradients[i, k, m]);
   end;
   Result := LOutput.Flat;
 end;
@@ -50,7 +51,9 @@ end;
 procedure TMaxPoolingLayer.Build;
 begin
   inherited;
-  FOutputShape := TShape.Create(FInputShape.Width div FSize.cx, FInputShape.Height div FSize.cy);
+  FOutputShape := Copy(FInputShape);
+  FOutputShape[0] := FInputShape[0] div FSize.cx;
+  FOutputShape[1] := FInputShape[1] div FSize.cy;
 end;
 
 constructor TMaxPoolingLayer.Create(const ASize: TSize);
@@ -62,7 +65,7 @@ end;
 function TMaxPoolingLayer.FeedForward(
   const Input: TArray<Single>): TArray<Single>;
 var
-  i, k: Integer;
+  i, k, m: Integer;
   LInput, LOutput: TNums;
 begin
   LInput := TNums.Create(FInputShape, Input);
@@ -71,13 +74,14 @@ begin
   for i := 0 to Pred(LOutput.Shape.Width) do
   begin
     for k := 0 to Pred(LOutput.Shape.Height) do
-      Sample(i, k, LInput, LOutput);
+      for m := 0 to Pred(LOutput.Shape.Depth) do
+        Sample(i, k, m, LInput, LOutput);
   end;
   Result := LOutput.Flat;
   FLastOutput := Result;
 end;
 
-procedure TMaxPoolingLayer.PutBacki(X, Y: Integer; const AInputs, AOutput: TNums; const AHighValue, AGradient: Single);
+procedure TMaxPoolingLayer.PutBacki(X, Y, Z: Integer; const AInputs, AOutput: TNums; const AHighValue, AGradient: Single);
 var
   i, k: Integer;
 begin
@@ -85,30 +89,32 @@ begin
   begin
     for k := Y to Y +Pred(FSize.cy) do
     begin
-      if AInputs[i, k] <> AHighValue then
-        AOutput[i, k] := 0
+      if AInputs[i, k, z] <> AHighValue then
+        AOutput[i, k, Z] := 0
       else
-        AOutput[i, k] := AGradient;
+        AOutput[i, k, Z] := AGradient;
     end;
   end;
 end;
 
-procedure TMaxPoolingLayer.Sample(X, Y: Integer; const AInput, AOutput: TNums);
+procedure TMaxPoolingLayer.Sample(X, Y, Z: Integer; const AInput, AOutput: TNums);
 var
-  i, k: Integer;
+  i, k, LX, LY: Integer;
   LVal, LCurrent: Single;
 begin
-  LVal := AInput[x*FSize.cx, Y*FSize.cy];
+  LX := X*FSize.cx;
+  LY := Y*FSize.cy;
+  LVal := AInput[LX, LY, Z];
   for i := 0 to Pred(FSize.cx) do
   begin
     for k := 0 to Pred(FSize.cy) do
     begin
-      LCurrent := AInput[X*FSize.cx + i, Y*FSize.cy + k];
+      LCurrent := AInput[LX + i, LY + k, Z];
       if LCurrent > LVal then
         LVal := LCurrent;
     end;
   end;
-  AOutput[X, Y] := LVal;
+  AOutput[X, Y, Z] := LVal;
 end;
 
 end.

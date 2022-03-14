@@ -310,7 +310,7 @@ end;
 procedure TNums.SetValue3(X, Y, Z: Integer; const Value: Single);
 begin
   Assert(CheckBounds(FShape, X, Y, Z));
-  FData[(FShape[1] * FShape[0] * Z) + (FShape[0] * Y) + X] := Value;
+  FData[(FShape[0] * FShape[1] * Z) + (FShape[0] * Y) + X] := Value;
 end;
 
 class operator TNums.Subtract(const ALeft: TNums; const Value: Single): TNums;
