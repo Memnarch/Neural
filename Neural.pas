@@ -72,6 +72,7 @@ type
     class function Random: TInitializerFunc; static;
     class function Fixed(const Values: TArray<Single>): TInitializerFunc; static;
     class function Default: TInitializerFunc; static;
+    class function Ones: TInitializerFunc; static;
   end;
 
 //make compiler happy
@@ -361,6 +362,18 @@ begin
                 LScale := System.Random(CMax) / CMax;
                 Result.Flat[i] := (LScale * LLimit * 2) - LLimit;
               end;
+            end;
+end;
+
+class function TInitializers.Ones: TInitializerFunc;
+begin
+  Result := function(const AShape: TShape): TNums
+            var
+              i: Integer;
+            begin
+              Result := TNums.Create(AShape);
+              for i := Low(Result.Flat) to High(Result.Flat) do
+                Result.Flat[i] := 1;
             end;
 end;
 

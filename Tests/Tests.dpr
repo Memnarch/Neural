@@ -21,7 +21,11 @@ uses
   Neural.Network in '..\Neural.Network.pas',
   Neural in '..\Neural.pas',
   Tests.Layers.Pooling in 'Tests.Layers.Pooling.pas',
-  Tests.Layers.Dense in 'Tests.Layers.Dense.pas';
+  Tests.Layers.Dense in 'Tests.Layers.Dense.pas',
+  Neural.Optimizer in '..\Neural.Optimizer.pas',
+  Neural.Scheduler in '..\Neural.Scheduler.pas',
+  Tests.Layers.Conv in 'Tests.Layers.Conv.pas',
+  Neural.Layers.Conv in '..\Neural.Layers.Conv.pas';
 
 var
   runner: ITestRunner;
