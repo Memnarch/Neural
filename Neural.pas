@@ -35,6 +35,10 @@ type
     function Ref(X: Integer): PSingle; overload;
     function Ref(X, Y: Integer): PSingle; overload;
     function Ref(X, Y, Z: Integer): PSingle; overload;
+    class operator Multiply(const ALeft: TNums; const Value: Single): TNums; inline;
+    class operator Divide(const ALeft: TNums; const Value: Single): TNums; inline;
+    class operator Add(const ALeft: TNums; const Value: Single): TNums; inline;
+    class operator Subtract(const ALeft: TNums; const Value: Single): TNums; inline;
     property Value[X: Integer]: Single read GetValue write SetValue; default;
     property Value[X, Y: Integer]: Single read GetValue2 write SetValue2; default;
     property Value[X, Y, Z: Integer]: Single read GetValue3 write SetValue3; default;
@@ -64,6 +68,7 @@ type
   TInitializerFunc = reference to function(const AShape: TShape): TNums;
 
   TInitializers = record
+    class function HeUniform: TInitializerFunc; static;
     class function Random: TInitializerFunc; static;
     class function Fixed(const Values: TArray<Single>): TInitializerFunc; static;
     class function Default: TInitializerFunc; static;
@@ -200,6 +205,15 @@ begin
 end;
 
 
+class operator TNums.Add(const ALeft: TNums; const Value: Single): TNums;
+var
+  i: Integer;
+begin
+  Result := ALeft;
+  for i := Low(Result.FData) to High(Result.FData) do
+    Result.FData[i] := Result.FData[i] + Value;
+end;
+
 class function TNums.Create(const AShape: TShape;
   const AValues: TArray<Single>): TNums;
 begin
@@ -223,6 +237,15 @@ function TNums.Ref(X, Y, Z: Integer): PSingle;
 begin
   Assert(CheckBounds(FShape, X, Y, Z));
   Result := @FData[(FShape[0] * FShape[1] * Z)  + FShape[0]*Y + X];
+end;
+
+class operator TNums.Divide(const ALeft: TNums; const Value: Single): TNums;
+var
+  i: Integer;
+begin
+  Result := ALeft;
+  for i := Low(Result.FData) to High(Result.FData) do
+    Result.FData[i] := Result.FData[i] / Value;
 end;
 
 function TNums.GetFlat: TArray<Single>;
@@ -253,6 +276,15 @@ begin
   Result := FData[(FShape[0] * FShape[1] * Z)  + FShape[0]*Y + X];
 end;
 
+class operator TNums.Multiply(const ALeft: TNums; const Value: Single): TNums;
+var
+  i: Integer;
+begin
+  Result := ALeft;
+  for i := Low(Result.FData) to High(Result.FData) do
+    Result.FData[i] := Result.FData[i] * Value;
+end;
+
 procedure TNums.Reshape(const AShape: TShape);
 var
   LSize: Integer;
@@ -281,6 +313,15 @@ begin
   FData[(FShape[1] * FShape[0] * Z) + (FShape[0] * Y) + X] := Value;
 end;
 
+class operator TNums.Subtract(const ALeft: TNums; const Value: Single): TNums;
+var
+  i: Integer;
+begin
+  Result := ALeft;
+  for i := Low(Result.FData) to High(Result.FData) do
+    Result.FData[i] := Result.FData[i] - Value;
+end;
+
 function TShapeHelper.GetWidth: Integer;
 begin
   Assert(Length(Self) > 0);
@@ -291,7 +332,7 @@ end;
 
 class function TInitializers.Default: TInitializerFunc;
 begin
-  Result := TInitializers.Random();
+  Result := TInitializers.HeUniform();
 end;
 
 class function TInitializers.Fixed(
@@ -300,6 +341,26 @@ begin
   Result := function(const AShape: TShape): TNums
             begin
               Result := TNums.Create(AShape, Copy(Values));
+            end;
+end;
+
+class function TInitializers.HeUniform: TInitializerFunc;
+begin
+  Result := function(const AShape: TShape): TNums
+            var
+              i, LCount: Integer;
+              LLimit, LScale: Single;
+            const
+              CMax = 1000;
+            begin
+              Result := TNums.Create(AShape);
+              LCount := Length(Result.Flat);
+              LLimit := Sqr(6 / LCount);
+              for i := Low(Result.Flat) to High(Result.Flat) do
+              begin
+                LScale := System.Random(CMax) / CMax;
+                Result.Flat[i] := (LScale * LLimit * 2) - LLimit;
+              end;
             end;
 end;
 
@@ -316,7 +377,7 @@ begin
               LCount := Length(Result.Flat);
               LBase := 1 / LCount;
               for i := Low(Result.Flat) to High(Result.Flat) do
-                Result.Flat[i] := System.Random(CMax) / CMax * LBase;
+                Result.Flat[i] := (System.Random(CMax) / (CMax div 2) - 1) * LBase;
             end;
 end;
 
