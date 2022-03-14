@@ -41,7 +41,7 @@ begin
         LVal := LVal + (Input[i+X, k+Y] * FKernels[f][i, k]);
     end;
   end;
-  Target[X, Y] := LVal;
+  Target[X, Y] := FActivation.Run(LVal);
 end;
 
 procedure TConv2D.ApplySingleKernel(X, Y, Index: Integer; const Input,
@@ -99,12 +99,14 @@ end;
 procedure TConv2D.DeriveKernel(X, Y: Integer; const AKernel, AGradients, AInput, ATargetGradients: TNums);
 var
   i, k: Integer;
+  LDActivated: Single;
 begin
   for i := 0 to Pred(AKernel.Shape.Width) do
     for k := 0 to Pred(AKernel.Shape.Height) do
     begin
-      ATargetGradients[x+i, y+k] := ATargetGradients[x+i, y+k] + AKernel[i, k] * AInput[i+x, k+y] * AGradients[X, Y];
-      AKernel[i, k] := AKernel[i, k] + (AGradients[X, Y] * AInput[i+X, k+Y]);
+      LDActivated := FActivation.Derive(AInput[i+X, k+Y]);
+      ATargetGradients[x+i, y+k] := ATargetGradients[x+i, y+k] + AKernel[i, k] * LDActivated * AGradients[X, Y];
+      AKernel[i, k] := AKernel[i, k] + (AGradients[X, Y] * LDActivated);
     end;
 end;
 
