@@ -15,7 +15,7 @@ type
     constructor Create();
     destructor Destroy; override;
     procedure LoadFromFile(const AFile: string);
-    function ToLumenValues: TArray<Single>;
+    function ToLumenValues: TNums;
     procedure FromLumenValues(const ANums: TNums);
     property Image: TBitmap read FImage;
   end;
@@ -64,7 +64,7 @@ begin
     LLine := FImage.ScanLine[i];
     for k := 0 to Pred(FImage.Width) do
     begin
-      LNum := ANums[i, k] * - 255;
+      LNum := ANums[k, i] * 255;
       LVal := Max(0, Min(255, Round(LNum)));
       LLine[k].R := LVal;
       LLine[k].G := LVal;
@@ -101,23 +101,20 @@ begin
   end;
 end;
 
-function TNeuralImage.ToLumenValues: TArray<Single>;
+function TNeuralImage.ToLumenValues: TNums;
 var
   LPixels: PRGB24;
   i, k: Integer;
   LLumen: Single;
-  LCursor: Integer;
 begin
-  SetLength(Result, FImage.Width*FImage.Height);
-  LCursor := 0;
+  Result := TNums.Create([Fimage.Width, FImage.Height]);
   for i := 0 to Pred(FImage.Height) do
   begin
     LPixels := FImage.ScanLine[i];
     for k := 0 to Pred(FImage.Width) do
     begin
       LLumen := 0.2126 * LPixels[k].R + 0.7152 * LPixels[k].G + 0.0722 * LPixels[k].B;
-      Result[LCursor] := LLumen / 255 - 0.5;//normalize
-      Inc(LCursor);
+      Result[k, i] := LLumen / 255;//normalize
     end;
   end;
 end;
