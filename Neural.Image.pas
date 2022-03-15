@@ -17,6 +17,8 @@ type
     procedure LoadFromFile(const AFile: string);
     function ToLumenValues: TNums;
     procedure FromLumenValues(const ANums: TNums);
+    function ToRGB: TNums;
+    procedure FromRGB(const Values: TNums);
     property Image: TBitmap read FImage;
   end;
 
@@ -73,6 +75,24 @@ begin
   end;
 end;
 
+procedure TNeuralImage.FromRGB(const Values: TNums);
+var
+  LLine: PRGB24;
+  i, k: Integer;
+begin
+  FImage.SetSize(Values.Shape.Width, Values.Shape.Height);
+  for i := 0 to Pred(FImage.Height) do
+  begin
+    LLine := FImage.ScanLine[i];
+    for k := 0 to Pred(FImage.Width) do
+    begin
+      LLine[k].R := Max(0, Min(255, Round(Values[i, k, 0] * 255)));
+      LLine[k].G := Max(0, Min(255, Round(Values[i, k, 1] * 255)));
+      LLine[k].B := Max(0, Min(255, Round(Values[i, k, 2] * 255)));
+    end;
+  end;
+end;
+
 procedure TNeuralImage.LoadFromFile(const AFile: string);
 var
   LPic: TPicture;
@@ -115,6 +135,24 @@ begin
     begin
       LLumen := 0.2126 * LPixels[k].R + 0.7152 * LPixels[k].G + 0.0722 * LPixels[k].B;
       Result[k, i] := LLumen / 255;//normalize
+    end;
+  end;
+end;
+
+function TNeuralImage.ToRGB: TNums;
+var
+  LPixels: PRGB24;
+  i, k: Integer;
+begin
+  Result := TNums.Create([Fimage.Width, FImage.Height, 3]);
+  for i := 0 to Pred(FImage.Height) do
+  begin
+    LPixels := FImage.ScanLine[i];
+    for k := 0 to Pred(FImage.Width) do
+    begin
+      Result[k, i, 0] := LPixels[k].R / 255;//normalize
+      Result[k, i, 1] := LPixels[k].G / 255;//normalize
+      Result[k, i, 2] := LPixels[k].B / 255;//normalize
     end;
   end;
 end;
