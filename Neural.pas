@@ -31,10 +31,11 @@ type
     procedure SetValue3(X, Y, Z: Integer; const Value: Single); inline;
   public
     class function Create(const AShape: TShape; const AValues: TArray<Single> = nil): TNums; static;
-    procedure Reshape(const AShape: TShape);
-    function Ref(X: Integer): PSingle; overload;
-    function Ref(X, Y: Integer): PSingle; overload;
-    function Ref(X, Y, Z: Integer): PSingle; overload;
+    procedure Reshape(const AShape: TShape); inline;
+    function Ref(X: Integer): PSingle; overload; inline;
+    function Ref(X, Y: Integer): PSingle; overload; inline;
+    function Ref(X, Y, Z: Integer): PSingle; overload; inline;
+    procedure FillZero; inline;
     class operator Multiply(const ALeft: TNums; const Value: Single): TNums; inline;
     class operator Divide(const ALeft: TNums; const Value: Single): TNums; inline;
     class operator Add(const ALeft: TNums; const Value: Single): TNums; inline;
@@ -45,6 +46,8 @@ type
     property Flat: TArray<Single> read GetFlat;
     property Shape: TShape read FShape;
   end;
+
+  PNums = ^TNums;
 
   TActivationFunc = function(const Value: Single): Single;
 
@@ -247,6 +250,11 @@ begin
   Result := ALeft;
   for i := Low(Result.FData) to High(Result.FData) do
     Result.FData[i] := Result.FData[i] / Value;
+end;
+
+procedure TNums.FillZero;
+begin
+  FillChar(FData[0], Length(FData) * SizeOf(Single), 0);
 end;
 
 function TNums.GetFlat: TArray<Single>;
