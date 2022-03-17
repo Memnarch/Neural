@@ -12,11 +12,13 @@ type
     FNeuronCount: Integer;
     FWeights: TArray<TArray<Single>>;
     FBiases: TArray<Single>;
-    FLastOutput: TArray<Single>;
+    FLastOutput: TNums;
+    FLastFeedForward: TNums;
+    FLastBackpropagade: TNums;
     FLastInput: TArray<Single>;
-    FBackPropagationBuffer: TArray<TArray<Single>>;
+    FBackPropagationBuffer: TArray<TNums>;
     function RunNode(const AInputs, AWeights: TArray<Single>; ABias: Single): Single;
-    procedure RunNodeBackwards(const AResult, Gradient, ALearnRate: Single; var AWeights: TArray<Single>; var ABias: Single; var TargetGradients: TArray<Single>);
+    procedure RunNodeBackwards(const AResult, Gradient, ALearnRate: Single; var AWeights: TArray<Single>; var ABias: Single; var TargetGradients: TNums);
   public
     constructor Create(ACount: Integer; const AActivation: TActivation; const AWeightInitializer: TInitializerFunc = nil); reintroduce;
     procedure Build; override;
@@ -37,22 +39,24 @@ function TDenseLayer.Backpropagade(const AGradients: TArray<Single>;
   const ALearningRate: Single): TArray<Single>;
 var
   LResult: TArray<Single>;
-  i: Integer;
+  i, k: Integer;
 begin
-  SetLength(Result, Length(FLastInput));
-  ZeroMemory(@Result[0], Length(Result) * SizeOf(Result[0]));
+  FLastBackpropagade.FillZero;
   RunScheduled(Length(FWeights),
     procedure(Index: Integer)
     begin
-      ZeroMemory(@FBackPropagationBuffer[Index, 0], Length(FBackPropagationBuffer[Index]) * SizeOf(Single));
+      FBackPropagationBuffer[Index].FillZero;
       RunNodeBackwards(FLastOutput[Index], AGradients[Index], ALearningRate, FWeights[Index], FBiases[Index], FBackPropagationBuffer[Index]);
     end
   );
-  for LResult in FBackPropagationBuffer do
+  Result := FLastBackpropagade.Flat;
+  for k := Low(FBackPropagationBuffer) to High(FBackPropagationBuffer) do
   begin
+    LResult := FBackPropagationBuffer[k].Flat;
     for i := Low(LResult) to High(LResult) do
       Result[i] := Result[i] + LResult[i];
   end;
+
 end;
 
 procedure TDenseLayer.Build;
@@ -65,12 +69,15 @@ begin
   SetLength(FWeights, FNeuronCount);
   SetLength(FBiases, FNeuronCount);
   FOutputShape := TShape.Create(FNeuronCount);
+  FLastOutput.Reshape(FOutputShape);
+  FLastFeedForward.Reshape(FOutputShape);
+  FLastBackpropagade.Reshape(FInputShape);
   LInputs := FInputShape.Size;
   for i := Low(FWeights) to High(FWeights) do
   begin
     FWeights[i] := FWeightInitializer([LInputs]).Flat;
     FBiases[i] := 0;
-    SetLength(FBackPropagationBuffer[i], LInputs);
+    FBackPropagationBuffer[i].Reshape([LInputs]);
   end;
 end;
 
@@ -81,20 +88,16 @@ begin
 end;
 
 function TDenseLayer.FeedForward(const Input: TArray<Single>): TArray<Single>;
-var
-  LResult: TArray<Single>;
 begin
   FLastInput := Input;
-  SetLength(LResult, FOutputShape.Size);
-  SetLength(FLastOutput, FOutputShape.Size);
   RunScheduled(Length(FWeights),
     procedure(Index: Integer)
     begin
       FLastOutput[Index] := RunNode(Input, FWeights[Index], FBiases[Index]);
-      LResult[Index] := FActivation.Run(FLastOutput[Index]);
+      FLastFeedForward[Index] := FActivation.Run(FLastOutput[Index]);
     end
   );
-  Result := LResult;
+  Result := FLastFeedForward.Flat;
 end;
 
 function TDenseLayer.RunNode(const AInputs, AWeights: TArray<Single>;
@@ -111,7 +114,7 @@ procedure TDenseLayer.RunNodeBackwards(
   const AResult, Gradient, ALearnRate: Single;
   var AWeights: TArray<Single>;
   var ABias: Single;
-  var TargetGradients: TArray<Single>);
+  var TargetGradients: TNums);
 var
   i: Integer;
   LDerived, LGradient: Single;
