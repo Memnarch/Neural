@@ -79,32 +79,34 @@ end;
 function TConv2D.Backpropagade(const AGradients: TArray<Single>;
   const ALearningRate: Single): TArray<Single>;
 var
-  LDKernel: TNums;
   LGradients: TNums;
-  i, k, m, f: Integer;
-  LFilter: TArray<TNums>;
-  LKernel: PNums;
 begin
   FLastBackpropagade.FillZero;
-  LDKernel := TNums.Create(FKernelSize + [FInputShape.Depth]);
   LGradients := TNums.Create(FOutputShape, AGradients);
-  for f := 0 to High(FFilters) do
-  begin
-    LDKernel.FillZero;
-    LFilter := FFilters[f];
-    for i := 0 to Pred(LGradients.Shape.Width) do
-      for k := 0 to Pred(LGradients.Shape.Height) do
-        for m := 0 to Pred(LGradients.Shape.Depth) do
-          DeriveKernel(i, k, m, LGradients[i, k, m], LFilter[m], LDKernel, FLastInput, FLastBackpropagade);
-
-    for m := 0 to Pred(LDKernel.Shape.Depth) do
+  RunScheduled(FInputShape.Depth,
+    procedure(Index: Integer)
+    var
+      LFilter: TArray<TNums>;
+      LKernel: PNums;
+      LDKernel: TNums;
+      i, k, f: Integer;
     begin
-      LKernel := @LFilter[m];
-      for i := 0 to Pred(LDKernel.Shape.Width) do
-        for k := 0 to Pred(LDKernel.Shape.Height) do
-            LKernel^[i, k] := LKernel^[i, k] - ALearningRate * LDKernel[i, k, m];
-    end;
-  end;
+      LDKernel := TNums.Create(FKernelSize + [FInputShape.Depth]);
+      for f := 0 to High(FFilters) do
+      begin
+        LDKernel.FillZero;
+        LFilter := FFilters[f];
+        for i := 0 to Pred(LGradients.Shape.Width) do
+          for k := 0 to Pred(LGradients.Shape.Height) do
+              DeriveKernel(i, k, Index, LGradients[i, k, Index], LFilter[Index], LDKernel, FLastInput, FLastBackpropagade);
+
+
+        LKernel := @LFilter[Index];
+        for i := 0 to Pred(LDKernel.Shape.Width) do
+          for k := 0 to Pred(LDKernel.Shape.Height) do
+              LKernel^[i, k] := LKernel^[i, k] - ALearningRate * LDKernel[i, k, Index];
+      end;
+    end);
   Result := FLastBackpropagade.Flat;
 end;
 
@@ -171,17 +173,21 @@ begin
 end;
 
 function TConv2D.FeedForward(const Input: TArray<Single>): TArray<Single>;
-var
-  i, k, m: Integer;
 begin
   FLastOutput.FillZero;
   FLastInput := TNums.Create(FInputShape, Input);
-  for i := 0 to Pred(FLastOutput.Shape.Width) do
-  begin
-    for k := 0 to Pred(FLastOutput.Shape.Height) do
-      for m := 0 to Pred(FLastOutput.Shape.Depth) do
-        ApplyKernel(i, k, m, @FLastInput, @FLastOutput);
-  end;
+  RunScheduled(FLastOutput.Shape.Depth,
+    procedure(Index: Integer)
+    var
+      i, k: Integer;
+    begin
+      for i := 0 to Pred(FLastOutput.Shape.Width) do
+      begin
+        for k := 0 to Pred(FLastOutput.Shape.Height) do
+            ApplyKernel(i, k, Index, @FLastInput, @FLastOutput);
+      end;
+    end
+  );
   Result := FLastOutput.Flat;
 end;
 
