@@ -261,10 +261,10 @@ function TNums.GetFlat: TArray<Single>;
 var
   LSize: Integer;
 begin
-  Result := FData;
   LSize := FShape.Size;
-  if LSize < Length(Result) then
-    SetLength(Result, LSize);
+  if LSize < Length(FData) then
+    SetLength(FData, LSize);
+  Result := FData;
 end;
 
 function TNums.GetValue(X: Integer): Single;
