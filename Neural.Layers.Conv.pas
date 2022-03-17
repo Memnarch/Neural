@@ -12,11 +12,12 @@ type
     FKernelSize: TShape;
     FFilterCount: Integer;
     FFilters: TArray<TArray<TNums>>;
-    FLastInput: TArray<Single>;
-    FLastOutput: TArray<Single>;
-    procedure ApplyKernel(X, Y, Z: Integer; const Input, Target: TNums);
+    FLastInput: TNums;
+    FLastOutput: TNums;
+    FLastBackpropagade: TNums;
+    procedure ApplyKernel(X, Y, Z: Integer; const Input, Target: PNums);
     procedure ApplySingleKernel(X, Y, Index: Integer; const Input, Target: TNums);
-    procedure DeriveKernel(X, Y, Z: Integer; const AOrigKernels: TArray<TNums>; const AKernel, AGradients, AInput, ATargetGradients: TNums);
+    procedure DeriveKernel(X, Y, Z: Integer; AGradient: Single; const AOrigKernel: TNums; const AKernel, AInput, ATargetGradients: TNums);
     procedure RaiseInvalidShape;
   public
     constructor Create(AFilters: Integer; AKernelSize: TShape; const AActivation: TActivation; const AWeightInitializer: TInitializerFunc = nil); reintroduce;
@@ -34,21 +35,29 @@ uses
 
 { TConv2D }
 
-procedure TConv2D.ApplyKernel(X, Y, Z: Integer; const Input, Target: TNums);
+{$ExcessPrecision OFF}
+{$PointerMath ON }
+
+procedure TConv2D.ApplyKernel(X, Y, Z: Integer; const Input, Target: PNums);
 var
   LVal: Single;
   i, k, f: Integer;
+  LKernel: PNums;
+  LInputRef, LKernelRef: PSingle;
 begin
   LVal := 0;
   for f := 0 to High(FFilters) do
   begin
-    for i := 0 to Pred(FKernelSize.Width) do
+    LKernel := @FFilters[f][Z];
+    for k := 0 to Pred(FKernelSize.Height)  do
     begin
-      for k := 0 to Pred(FKernelSize.Height)  do
-          LVal := LVal + (Input[i+X, k+Y, Z] * FFilters[f][z][i, k]);
+      LInputRef := Input.Ref(X, k+Y, Z);
+      LKernelRef := LKernel.Ref(0, k);
+      for i := 0 to Pred(FKernelSize.Width) do
+        LVal := LVal + (LInputRef[i] * LKernelRef[i]);
     end;
   end;
-  Target[X, Y, Z] := FActivation.Run(LVal);
+  Target^[X, Y, Z] := FActivation.Run(LVal);
 end;
 
 procedure TConv2D.ApplySingleKernel(X, Y, Index: Integer; const Input, Target: TNums);
@@ -71,28 +80,32 @@ function TConv2D.Backpropagade(const AGradients: TArray<Single>;
   const ALearningRate: Single): TArray<Single>;
 var
   LDKernel: TNums;
-  LInput: TNums;
   LGradients: TNums;
   i, k, m, f: Integer;
-  LResult: TNums;
+  LFilter: TArray<TNums>;
+  LKernel: PNums;
 begin
-  LResult := TNums.Create(FInputShape);
+  FLastBackpropagade.FillZero;
+  LDKernel := TNums.Create(FKernelSize + [FInputShape.Depth]);
+  LGradients := TNums.Create(FOutputShape, AGradients);
   for f := 0 to High(FFilters) do
   begin
-    LDKernel := TNums.Create(FKernelSize + [FInputShape.Depth]);
-    LInput := TNums.Create(FInputShape, FLastInput);
-    LGradients := TNums.Create(FOutputShape, AGradients);
+    LDKernel.FillZero;
+    LFilter := FFilters[f];
     for i := 0 to Pred(LGradients.Shape.Width) do
       for k := 0 to Pred(LGradients.Shape.Height) do
         for m := 0 to Pred(LGradients.Shape.Depth) do
-          DeriveKernel(i, k, m, FFilters[f], LDKernel, LGradients, LInput, LResult);
+          DeriveKernel(i, k, m, LGradients[i, k, m], LFilter[m], LDKernel, FLastInput, FLastBackpropagade);
 
-    for i := 0 to Pred(LDKernel.Shape.Width) do
-      for k := 0 to Pred(LDKernel.Shape.Height) do
-        for m := 0 to Pred(LDKernel.Shape.Depth) do
-          FFilters[f][m][i, k] := FFilters[f][m][i, k] - ALearningRate * LDKernel[i, k, m];
+    for m := 0 to Pred(LDKernel.Shape.Depth) do
+    begin
+      LKernel := @LFilter[m];
+      for i := 0 to Pred(LDKernel.Shape.Width) do
+        for k := 0 to Pred(LDKernel.Shape.Height) do
+            LKernel^[i, k] := LKernel^[i, k] - ALearningRate * LDKernel[i, k, m];
+    end;
   end;
-  Result := LResult.Flat;
+  Result := FLastBackpropagade.Flat;
 end;
 
 procedure TConv2D.Build;
@@ -112,6 +125,8 @@ begin
   FOutputShape := Copy(FInputShape);
   FOutputShape[0] := FInputShape[0] - Pred(FKernelSize[0]);
   FOutputShape[1] := FInputShape[1] - Pred(FKernelSize[0]);
+  FLastOutput.Reshape(FOutputShape);
+  FLastBackpropagade.Reshape(FInputShape);
 end;
 
 constructor TConv2D.Create(AFilters: Integer; AKernelSize: TShape;
@@ -122,18 +137,26 @@ begin
   FKernelSize := AKernelSize;
 end;
 
-procedure TConv2D.DeriveKernel(X, Y, Z: Integer; const AOrigKernels: TArray<TNums>; const AKernel, AGradients, AInput, ATargetGradients: TNums);
+procedure TConv2D.DeriveKernel(X, Y, Z: Integer; AGradient: Single; const AOrigKernel: TNums; const AKernel, AInput, ATargetGradients: TNums);
 var
   i, k: Integer;
-  LDActivated: Single;
+  LDActivated, LGradient: Single;
+  LInputRef, LTargetRef, LOrigKernelRef, LKernelRef: PSingle;
 begin
-  for i := 0 to Pred(AKernel.Shape.Width) do
-    for k := 0 to Pred(AKernel.Shape.Height) do
+  for k := 0 to Pred(AKernel.Shape.Height) do
+  begin
+    LInputRef := AInput.Ref(X, k+Y, Z);
+    LTargetRef := ATargetGradients.Ref(X, Y+k, Z);
+    LOrigKernelRef := AOrigKernel.Ref(0, k);
+    LKernelRef := AKernel.Ref(0, k, Z);
+    for i := 0 to Pred(AKernel.Shape.Width) do
     begin
-      LDActivated := FActivation.Derive(AInput[i+X, k+Y, Z]);
-      ATargetGradients[x+i, y+k, Z] := ATargetGradients[x+i, y+k, Z] + AOrigKernels[Z][i, k] * LDActivated * AGradients[X, Y, Z];
-      AKernel[i, k, Z] := AKernel[i, k, Z] + (AGradients[X, Y, Z] * LDActivated);
+      LDActivated := FActivation.Derive(LInputRef[i]);
+      LGradient := AGradient * LDActivated;
+      LTargetRef[i] := LTargetRef[i] + LOrigKernelRef[i] * LGradient;
+      LKernelRef[i] := LKernelRef[i] + LGradient;
     end;
+  end;
 end;
 
 procedure TConv2D.DrawFeatureMap(AIndex: Integer; const AInput, ATarget: TNums);
@@ -149,21 +172,17 @@ end;
 
 function TConv2D.FeedForward(const Input: TArray<Single>): TArray<Single>;
 var
-  LInput: TNums;
-  LOutput: TNums;
   i, k, m: Integer;
 begin
-  FLastInput := Input;
-  LInput := TNums.Create(FInputShape, Input);
-  LOutput := TNums.Create(FOutputShape);
-  for i := 0 to Pred(LOutput.Shape.Width) do
+  FLastOutput.FillZero;
+  FLastInput := TNums.Create(FInputShape, Input);
+  for i := 0 to Pred(FLastOutput.Shape.Width) do
   begin
-    for k := 0 to Pred(LOutput.Shape.Height) do
-      for m := 0 to Pred(LOutput.Shape.Depth) do
-        ApplyKernel(i, k, m, LInput, LOutput);
+    for k := 0 to Pred(FLastOutput.Shape.Height) do
+      for m := 0 to Pred(FLastOutput.Shape.Depth) do
+        ApplyKernel(i, k, m, @FLastInput, @FLastOutput);
   end;
-  Result := LOutput.Flat;
-  FLastOutput := Result;
+  Result := FLastOutput.Flat;
 end;
 
 procedure TConv2D.RaiseInvalidShape;
